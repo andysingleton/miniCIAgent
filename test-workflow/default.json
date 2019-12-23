@@ -1,0 +1,6 @@
+{
+  "name": "test-workflow",
+  "build": [
+    { "make": "output.dat" }
+  ]
+}

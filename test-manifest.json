@@ -1,0 +1,6 @@
+{
+  "name": "test-pipeline",
+  "starting workflow": "test-workflow",
+  "executors": "docker",
+  "dockerfile": "Dockerfile"
+}
