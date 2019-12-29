@@ -3,11 +3,29 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 )
 
-func BuildContainer(filename string, image_name string) {
+func getQualifiedFilename(filename string) string {
+	var qualified_filename string
+
+	if filepath.IsAbs(filename) == true {
+		qualified_filename = filename
+	} else {
+		cwd, err := os.Getwd()
+		check(err)
+		qualified_filename = filepath.Join(cwd, filename)
+	}
+
+	_, err := os.Stat(qualified_filename)
+	check(err)
+	return qualified_filename
+}
+
+func BuildContainer(filename string, image_name string, workflowId string) {
 	cmdStr := fmt.Sprintf("docker build . -f %s -t \"%s\"", filename, image_name)
 	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
 	check(err)
@@ -15,22 +33,25 @@ func BuildContainer(filename string, image_name string) {
 	fmt.Printf("%s", out)
 }
 
-func LaunchContainer(image_name string, workflow_name string, manifest_file string) {
-	containerName := fmt.Sprintf("miniCI-%s-%d", workflow_name, rand.Intn(1000))
-	binaryPath := getQualifiedFilename("miniCI")
-	manifestPath := getQualifiedFilename(manifest_file)
-	strippedManifestName := path.Base(manifest_file)
-	workflowPath := getQualifiedFilename(workflow_name)
+func LaunchContainer(imageName string, workflowName string, manifestFile string, workflowId string, miniciBinary string) {
+	ChildWorkflowId := fmt.Sprintf("%s-%d", workflowName, rand.Intn(1000))
+	containerName := fmt.Sprintf("miniCIAgent-%s", workflowId)
+	manifestPath := getQualifiedFilename(manifestFile)
+	strippedManifestName := path.Base(manifestFile)
+	workflowPath := getQualifiedFilename(workflowName)
 
 	cmdStr := fmt.Sprintf("/usr/bin/docker run --rm -t "+
 		"--name %s "+
-		"-v %s:/app/miniCI:ro "+
+		"-v %s:/app/miniCIAgent:ro "+
 		"-v %s:/app/%s:ro "+
 		"-v %s:/app/%s "+
-		"%s /app/miniCI -subprocess=yes",
-		containerName, binaryPath, manifestPath, strippedManifestName, workflowPath, workflow_name, image_name)
+		"%s /app/miniCIAgent -subprocess=yes -id=%s -manifest=docker-demo.json",
+		containerName, miniciBinary, manifestPath, strippedManifestName, workflowPath, workflowName,
+		imageName, ChildWorkflowId)
 
-	out, err := exec.Command("/bin/bash", "-c", cmdStr).Output()
+	fmt.Printf("%s: Starting child %s\n", workflowId, ChildWorkflowId)
+	fmt.Printf("%s: Command is %s\n", workflowId, cmdStr)
+	out, err := exec.Command("/bin/sh", "-c", cmdStr).Output()
 	check(err)
 	fmt.Printf("%s", out)
 }

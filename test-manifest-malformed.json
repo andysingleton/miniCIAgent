@@ -5,4 +5,3 @@
   "dockerfile": "test",
   "agentBinaryPath": "testpath",
   "webPort": 8080
-}

@@ -3,6 +3,6 @@
   "starting workflow": "test-workflow",
   "executors": "local",
   "dockerfile": "test",
-  "agentBinaryPath": "testpath",
-  "webPort": 8080
+  "agentBinaryPath": 7,
+  "webPort": "8080"
 }
