@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-
 	"log"
 	"net/http"
 	"sync"
@@ -16,28 +15,13 @@ var (
 	state AgentState
 )
 
-type AgentState struct {
-	Ip          string `json:"ip"`
-	ExecutionId string
-	State       string   `json:"state"`
-	Building    string   `json:"building"`
-	Done        []string `json:"done"`
-	// { "name": type }
-	Artefacts []Artefact `json:"artefacts"`
-}
-
-type Artefact struct {
-	Name string
-	Type string
-}
-
 type NetworkIpGetter interface {
-	Get(backend string) (string, error)
+	Get() (string, error)
 }
 
 type ipNetworkGetter string
 
-func (ipNetworkGetter) Get(backend string) (string, error) {
+func (backend ipNetworkGetter) Get() (string, error) {
 	switch backend {
 	case "local":
 		return "172.0.0.1", nil
@@ -47,54 +31,72 @@ func (ipNetworkGetter) Get(backend string) (string, error) {
 	return "", errors.New(fmt.Sprintf("Could not handle backend of %s", backend))
 }
 
-func initState(ipGetter NetworkIpGetter, backend string, executionId string) {
+type LocalStateUpdater interface {
+	InitState(ipGetter NetworkIpGetter, backend string, executionId string)
+	SetState(newState string)
+	SetBuilding(workflowName string)
+	AddDone(workflowName string)
+	AddArtefact(artefact Artefact)
+}
+
+type AgentState struct {
+	Ip          string
+	ExecutionId uuid.UUID
+	State       string
+	Building    string
+	Done        []string
+	// { "name": type }
+	Artefacts []Artefact
+}
+
+type Artefact struct {
+	Name string
+	Type string
+}
+
+func (st AgentState) initState(ipGetter NetworkIpGetter, backend string, executionId uuid.UUID) {
 	var err error
 
 	mutex.Lock()
-	state.Ip, err = ipGetter.Get(backend)
+	st.Ip, err = ipGetter.Get()
 	check(err)
-	state.ExecutionId = executionId
-	state.State = "Starting"
+	st.ExecutionId = executionId
+	st.State = "Starting"
 	mutex.Unlock()
 }
 
-func setState(newState string) {
+func (st AgentState) setState(newState string) {
 	mutex.Lock()
-	state.State = newState
+	st.State = newState
 	mutex.Unlock()
 }
 
-func setBuilding(workflowName string) {
+func (st AgentState) setBuilding(workflowName string) {
 	mutex.Lock()
-	state.Building = workflowName
+	st.Building = workflowName
 	mutex.Unlock()
 }
 
-func addDone(workflowName string) {
+func (st AgentState) addDone(workflowName string) {
 	mutex.Lock()
-	state.Done = append(state.Done, workflowName)
+	st.Done = append(st.Done, workflowName)
 	mutex.Unlock()
 }
 
-func addArtefact(artefact Artefact) {
+func (st AgentState) addArtefact(artefact Artefact) {
 	mutex.Lock()
-	state.Artefacts = append(state.Artefacts, artefact)
+	st.Artefacts = append(st.Artefacts, artefact)
 	mutex.Unlock()
 }
 
-func listener(backend string, executionId uuid.UUID, webPort int) {
+func listener(ipGetter NetworkIpGetter, backend string, executionId uuid.UUID, webPort int) {
 	fmt.Println(executionId, ": Starting Listener")
 
-	var ipGetter ipNetworkGetter
-	initState(ipGetter, backend, fmt.Sprintf("%s", executionId))
-	fmt.Println("State is currently", state.State)
+	state.initState(ipGetter, backend, executionId)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		output, err := json.Marshal(state)
 		check(err)
-		fmt.Println("State is currently", string(output))
-		//json, err := fmt.Sprintf("Returning %s", string(output))
-		//check(err)
 		fmt.Fprintf(w, string(output))
 	})
 

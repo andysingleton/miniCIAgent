@@ -27,6 +27,7 @@ func getWorkflows(manifestFile string) Workflows {
 func GetAvailableWorkflow(workflows Workflows, agentStates memberlist.Memberlist, webPort int) (Workflow, error) {
 	var agents []AgentState
 	agents = getAllAgentStates(agentStates, webPort)
+	fmt.Println("Got agents", agents)
 	var unavailableList []string
 	var artefacts []Artefact
 

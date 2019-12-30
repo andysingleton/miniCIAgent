@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 )
 
 func TestGetNetworkIp_local(t *testing.T) {
 	expectedResult := "172.0.0.1"
-	result, err := getNetworkIp("local")
+	result, err := ipNetworkGetter("wef").Get("local")
 
 	if err != nil {
 		t.Errorf("Function raised an error: %s", err)
@@ -18,7 +20,7 @@ func TestGetNetworkIp_local(t *testing.T) {
 
 func TestGetNetworkIp_dockerl(t *testing.T) {
 	expectedResult := "172.17.0.1"
-	result, err := getNetworkIp("docker")
+	result, err := ipNetworkGetter("wef").Get("docker")
 
 	if err != nil {
 		t.Errorf("Function raised an error: %s", err)
@@ -29,7 +31,7 @@ func TestGetNetworkIp_dockerl(t *testing.T) {
 }
 
 func TestGetNetworkIp_fail(t *testing.T) {
-	_, err := getNetworkIp("foobar")
+	_, err := ipNetworkGetter("wef").Get("foobar")
 
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
@@ -42,6 +44,12 @@ func TestInitState(t *testing.T) {
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
 	}
+}
+
+type stubIpNetworkGetter string
+
+func (stubIpNetworkGetter) Get(backend string) (string, error) {
+	return "10.0.0.1", nil
 }
 
 //

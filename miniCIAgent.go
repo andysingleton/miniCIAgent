@@ -82,7 +82,8 @@ func main() {
 	check(err)
 
 	// spawn the status webservice
-	go listener(pipelineConfig.ExecutorBackend, executionId, pipelineConfig.WebPort)
+	ipGetter := ipNetworkGetter(pipelineConfig.ExecutorBackend)
+	go listener(ipGetter, pipelineConfig.ExecutorBackend, executionId, pipelineConfig.WebPort)
 	time.Sleep(1 * time.Second)
 
 	// Local behaviour is to run all workflows in one process
