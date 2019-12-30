@@ -1,14 +1,15 @@
 package main
 
 import (
-	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"reflect"
 	"testing"
 )
 
 func TestGetNetworkIp_local(t *testing.T) {
 	expectedResult := "172.0.0.1"
-	result, err := ipNetworkGetter("wef").Get("local")
+	result, err := NetworkManager{"local", 8080}.Get()
 
 	if err != nil {
 		t.Errorf("Function raised an error: %s", err)
@@ -20,7 +21,7 @@ func TestGetNetworkIp_local(t *testing.T) {
 
 func TestGetNetworkIp_dockerl(t *testing.T) {
 	expectedResult := "172.17.0.1"
-	result, err := ipNetworkGetter("wef").Get("docker")
+	result, err := NetworkManager{"docker", 8080}.Get()
 
 	if err != nil {
 		t.Errorf("Function raised an error: %s", err)
@@ -31,25 +32,130 @@ func TestGetNetworkIp_dockerl(t *testing.T) {
 }
 
 func TestGetNetworkIp_fail(t *testing.T) {
-	_, err := ipNetworkGetter("wef").Get("foobar")
+	_, err := NetworkManager{"foobar", 8080}.Get()
 
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
 	}
+}
+
+//type stubNetworkManager struct {
+//	backend string
+//	webPort int
+//}
+type StubNetworkManager struct{}
+
+func (StubNetworkManager) Get() (string, error) {
+	return "10.0.0.1", nil
+}
+
+func (StubNetworkManager) AddHandler() {
+	fmt.Println("thing")
+}
+
+func (StubNetworkManager) Listen() {
+	fmt.Println("thing")
 }
 
 func TestInitState(t *testing.T) {
-	initState("foobar")
+	ipGetter := StubNetworkManager{}
+	testStatus := AgentState{}
+	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	check(err)
+	expectedState := AgentState{
+		Ip:          "10.0.0.1",
+		ExecutionId: testId,
+		State:       "Starting",
+	}
+	testStatus.initState(ipGetter, testId)
 
-	if err == nil {
-		t.Errorf("Function did not raise expected error")
+	eq := reflect.DeepEqual(expectedState, testStatus)
+	if eq == false {
+		t.Errorf("Object does not match exspected state: %s", testStatus)
 	}
 }
 
-type stubIpNetworkGetter string
+func TestSetState(t *testing.T) {
+	ipGetter := StubNetworkManager{}
+	testStatus := AgentState{}
+	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	check(err)
+	expectedState := AgentState{
+		Ip:          "10.0.0.1",
+		ExecutionId: testId,
+		State:       "foobar",
+	}
+	testStatus.initState(ipGetter, testId)
+	testStatus.setState("foobar")
 
-func (stubIpNetworkGetter) Get(backend string) (string, error) {
-	return "10.0.0.1", nil
+	eq := reflect.DeepEqual(expectedState, testStatus)
+	if eq == false {
+		t.Errorf("Object does not match exspected state: %s", testStatus)
+	}
+}
+
+func TestSetBuilding(t *testing.T) {
+	ipGetter := StubNetworkManager{}
+	testStatus := AgentState{}
+	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	check(err)
+	expectedState := AgentState{
+		Ip:          "10.0.0.1",
+		ExecutionId: testId,
+		State:       "Starting",
+		Building:    "foobar",
+	}
+	testStatus.initState(ipGetter, testId)
+	testStatus.setBuilding("foobar")
+
+	eq := reflect.DeepEqual(expectedState, testStatus)
+	if eq == false {
+		t.Errorf("Object does not match exspected state: %s", testStatus)
+	}
+}
+
+func TestAddDone(t *testing.T) {
+	ipGetter := StubNetworkManager{}
+	testStatus := AgentState{}
+	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	check(err)
+	expectedState := AgentState{
+		Ip:          "10.0.0.1",
+		ExecutionId: testId,
+		State:       "Starting",
+		Done:        []string{"foobar"},
+	}
+	testStatus.initState(ipGetter, testId)
+	testStatus.addDone("foobar")
+
+	eq := reflect.DeepEqual(expectedState, testStatus)
+	if eq == false {
+		t.Errorf("Object does not match exspected state: %s", testStatus)
+	}
+}
+
+func TestAddArtefact(t *testing.T) {
+	ipGetter := StubNetworkManager{}
+	testStatus := AgentState{}
+	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	check(err)
+	testArtefact := Artefact{
+		Name: "foobar",
+		Type: "file",
+	}
+	expectedState := AgentState{
+		Ip:          "10.0.0.1",
+		ExecutionId: testId,
+		State:       "Starting",
+		Artefacts:   []Artefact{testArtefact},
+	}
+	testStatus.initState(ipGetter, testId)
+	testStatus.addArtefact(testArtefact)
+
+	eq := reflect.DeepEqual(expectedState, testStatus)
+	if eq == false {
+		t.Errorf("Object does not match exspected state: %s", testStatus)
+	}
 }
 
 //
