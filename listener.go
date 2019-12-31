@@ -12,18 +12,23 @@ import (
 
 var (
 	mutex sync.Mutex
-	state AgentState
+	//state AgentState
 )
 
 type NetworkManagerInterface interface {
 	Get() (string, error)
-	AddHandler()
+	AddHandler(AgentStateInterface)
 	Listen()
+	Webport() int
 }
 
 type NetworkManager struct {
 	backend string
 	webPort int
+}
+
+func (net NetworkManager) Webport() int {
+	return net.webPort
 }
 
 func (net NetworkManager) Get() (string, error) {
@@ -36,9 +41,9 @@ func (net NetworkManager) Get() (string, error) {
 	return "", errors.New(fmt.Sprintf("Could not handle backend of %s", net.backend))
 }
 
-func (net NetworkManager) AddHandler() {
+func (net NetworkManager) AddHandler(state AgentStateInterface) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		output, err := json.Marshal(state)
+		output, err := json.Marshal(state.GetAgentState())
 		check(err)
 		fmt.Fprintf(w, string(output))
 	})
@@ -48,12 +53,13 @@ func (net NetworkManager) Listen() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", net.webPort), nil))
 }
 
-type LocalStateUpdater interface {
-	InitState(ipGetter NetworkManager, backend string, executionId string)
-	SetState(newState string)
-	SetBuilding(workflowName string)
-	AddDone(workflowName string)
-	AddArtefact(artefact Artefact)
+type AgentStateInterface interface {
+	InitState(NetworkManagerInterface)
+	SetStatus(string)
+	SetBuilding(string)
+	AddDone(string)
+	AddArtefact(Artefact)
+	GetAgentState() AgentState
 }
 
 type AgentState struct {
@@ -71,7 +77,11 @@ type Artefact struct {
 	Type string
 }
 
-func (st *AgentState) initState(ipGetter NetworkManagerInterface, executionId uuid.UUID) {
+func (st AgentState) GetAgentState() AgentState {
+	return st
+}
+
+func (st *AgentState) InitState(ipGetter NetworkManagerInterface) {
 	var err error
 
 	mutex.Lock()
@@ -82,35 +92,35 @@ func (st *AgentState) initState(ipGetter NetworkManagerInterface, executionId uu
 	mutex.Unlock()
 }
 
-func (st *AgentState) setState(newState string) {
+func (st *AgentState) SetStatus(newStatus string) {
 	mutex.Lock()
-	st.State = newState
+	st.State = newStatus
 	mutex.Unlock()
 }
 
-func (st *AgentState) setBuilding(workflowName string) {
+func (st *AgentState) SetBuilding(workflowName string) {
 	mutex.Lock()
 	st.Building = workflowName
 	mutex.Unlock()
 }
 
-func (st *AgentState) addDone(workflowName string) {
+func (st *AgentState) AddDone(workflowName string) {
 	mutex.Lock()
 	st.Done = append(st.Done, workflowName)
 	mutex.Unlock()
 }
 
-func (st *AgentState) addArtefact(artefact Artefact) {
+func (st *AgentState) AddArtefact(artefact Artefact) {
 	mutex.Lock()
 	st.Artefacts = append(st.Artefacts, artefact)
 	mutex.Unlock()
 }
 
-func listener(netManager NetworkManager, executionId uuid.UUID) {
+func listener(networkManager NetworkManagerInterface, stateManager AgentStateInterface) {
 	fmt.Println(executionId, ": Starting Listener")
 
-	state.initState(netManager, executionId)
+	stateManager.InitState(networkManager)
 
-	netManager.AddHandler()
-	netManager.Listen()
+	networkManager.AddHandler(stateManager)
+	networkManager.Listen()
 }

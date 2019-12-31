@@ -5,29 +5,50 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"miniCIAgent/memberlist"
 	"os"
 )
 
-func getWorkflows(manifestFile string) Workflows {
-	jsonFile, err := os.Open(manifestFile)
+type Workflows struct {
+	Workflows []Workflow `json:"workflows"`
+}
+
+type Workflow struct {
+	Name         string                   `json:"name"`
+	Tags         []string                 `json:"tags"`
+	Source       []map[string]string      `json:"source"`
+	Wants        []Artefact               `json:"wants"`
+	Steps        []map[string]interface{} `json:"steps"`
+	StepsIterate []map[string]string      `json:"stepsIterate"`
+	Provides     []map[string]string      `json:"provides"`
+	State        string
+}
+
+type WorkflowManagerInterface interface {
+	GetWorkflows()
+	GetAvailableWorkflow(AgentHandlerInterface, NetworkManagerInterface) (Workflow, error)
+}
+
+type WorkflowManager struct {
+	manifest  string
+	workflows Workflows
+}
+
+func (manager WorkflowManager) GetWorkflows() {
+	jsonFile, err := os.Open(manager.manifest)
 	check(err)
 	defer jsonFile.Close()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	check(err)
 
-	var workflows Workflows
-	err = json.Unmarshal(byteValue, &workflows)
+	err = json.Unmarshal(byteValue, &manager.workflows)
 	check(err)
-
-	return workflows
 }
 
-func GetAvailableWorkflow(workflows Workflows, agentStates memberlist.Memberlist, webPort int) (Workflow, error) {
+func (manager WorkflowManager) GetAvailableWorkflow(agentHandler AgentHandlerInterface, managerInterface NetworkManagerInterface) (Workflow, error) {
 	var agents []AgentState
-	agents = getAllAgentStates(agentStates, webPort)
-	fmt.Println("Got agents", agents)
+	agents = getAllAgentStates(agentHandler, managerInterface)
+	fmt.Println(executionId, ": Got agent states", agents)
 	var unavailableList []string
 	var artefacts []Artefact
 
@@ -39,23 +60,23 @@ func GetAvailableWorkflow(workflows Workflows, agentStates memberlist.Memberlist
 		artefacts = append(artefacts, agents[agent].Artefacts...)
 	}
 
-	for workflow := range workflows.Workflows {
+	for workflow := range manager.workflows.Workflows {
 		selectWorkflow := true
 
 		// is it available
 		for unavailable := range unavailableList {
-			if workflows.Workflows[workflow].Name == unavailableList[unavailable] {
+			if manager.workflows.Workflows[workflow].Name == unavailableList[unavailable] {
 				selectWorkflow = false
 			}
-			return workflows.Workflows[workflow], nil
+			return manager.workflows.Workflows[workflow], nil
 		}
 
 		// does it have all its pre-requisites
-		for workflowArtefact := range workflows.Workflows[workflow].Wants {
+		for workflowArtefact := range manager.workflows.Workflows[workflow].Wants {
 			// todo: is there set theory we could use here?
 			artefactOk := false
 			for artefact := range artefacts {
-				if workflows.Workflows[workflow].Wants[workflowArtefact].Name == artefacts[artefact].Name {
+				if manager.workflows.Workflows[workflow].Wants[workflowArtefact].Name == artefacts[artefact].Name {
 					artefactOk = true
 				}
 			}
@@ -64,7 +85,7 @@ func GetAvailableWorkflow(workflows Workflows, agentStates memberlist.Memberlist
 			}
 		}
 		if selectWorkflow == true {
-			return workflows.Workflows[workflow], nil
+			return manager.workflows.Workflows[workflow], nil
 		}
 	}
 	return Workflow{}, errors.New("There are no workflows")

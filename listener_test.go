@@ -49,7 +49,7 @@ func (StubNetworkManager) Get() (string, error) {
 	return "10.0.0.1", nil
 }
 
-func (StubNetworkManager) AddHandler() {
+func (StubNetworkManager) AddHandler(stateInterface AgentStateInterface) {
 	fmt.Println("thing")
 }
 
@@ -57,47 +57,51 @@ func (StubNetworkManager) Listen() {
 	fmt.Println("thing")
 }
 
+func (StubNetworkManager) Webport() int {
+	return 1001
+}
+
 func TestInitState(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	check(err)
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
 		ExecutionId: testId,
 		State:       "Starting",
 	}
-	testStatus.initState(ipGetter, testId)
+	testStatus.InitState(ipGetter)
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
-		t.Errorf("Object does not match exspected state: %s", testStatus)
+		t.Errorf("Object does not match expected state: %s", testStatus)
 	}
 }
 
 func TestSetState(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	check(err)
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
 		ExecutionId: testId,
 		State:       "foobar",
 	}
-	testStatus.initState(ipGetter, testId)
-	testStatus.setState("foobar")
+	testStatus.InitState(ipGetter)
+	testStatus.SetStatus("foobar")
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
-		t.Errorf("Object does not match exspected state: %s", testStatus)
+		t.Errorf("Object does not match expected state: %s", testStatus)
 	}
 }
 
 func TestSetBuilding(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	check(err)
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
@@ -105,8 +109,8 @@ func TestSetBuilding(t *testing.T) {
 		State:       "Starting",
 		Building:    "foobar",
 	}
-	testStatus.initState(ipGetter, testId)
-	testStatus.setBuilding("foobar")
+	testStatus.InitState(ipGetter)
+	testStatus.SetBuilding("foobar")
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
@@ -117,7 +121,7 @@ func TestSetBuilding(t *testing.T) {
 func TestAddDone(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	check(err)
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
@@ -125,8 +129,8 @@ func TestAddDone(t *testing.T) {
 		State:       "Starting",
 		Done:        []string{"foobar"},
 	}
-	testStatus.initState(ipGetter, testId)
-	testStatus.addDone("foobar")
+	testStatus.InitState(ipGetter)
+	testStatus.AddDone("foobar")
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
@@ -137,7 +141,7 @@ func TestAddDone(t *testing.T) {
 func TestAddArtefact(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("123e4567-e89b-12d3-a456-426655440000")
+	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	check(err)
 	testArtefact := Artefact{
 		Name: "foobar",
@@ -149,12 +153,12 @@ func TestAddArtefact(t *testing.T) {
 		State:       "Starting",
 		Artefacts:   []Artefact{testArtefact},
 	}
-	testStatus.initState(ipGetter, testId)
-	testStatus.addArtefact(testArtefact)
+	testStatus.InitState(ipGetter)
+	testStatus.AddArtefact(testArtefact)
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
-		t.Errorf("Object does not match exspected state: %s", testStatus)
+		t.Errorf("Object does not match expected state: %s", testStatus)
 	}
 }
 

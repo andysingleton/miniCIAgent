@@ -1,27 +1,33 @@
 package main
 
 import (
+	"github.com/google/uuid"
 	"testing"
 )
 
 func TestGetExecutionId_new(t *testing.T) {
-	_, err := getExecutionId("new")
+	err := setExecutionId("new")
 	if err != nil {
 		t.Errorf("Function raised an error: #{err}")
 	}
 }
 
 func TestGetExecutionId_parse_fail(t *testing.T) {
-	_, err := getExecutionId("blat")
+	err := setExecutionId("blat")
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
 	}
 }
 
 func TestGetExecutionId_parse_success(t *testing.T) {
-	_, err := getExecutionId("123e4567-e89b-12d3-a456-426655440000")
+	testId := "123e4567-e89b-12d3-a456-426655440000"
+	err := setExecutionId(testId)
 	if err != nil {
 		t.Errorf("Function raised an error: #{err}")
+	}
+	testUUID, _ := uuid.Parse(testId)
+	if testUUID != executionId {
+		t.Errorf("Execution ID is incorrect: %s", executionId)
 	}
 }
 
