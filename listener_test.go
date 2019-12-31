@@ -7,6 +7,42 @@ import (
 	"testing"
 )
 
+// NetworkManager test fixture
+var addHandlerCalled = false
+var listenCalled = false
+
+type StubNetworkManager struct{}
+
+func (StubNetworkManager) Listen()      { listenCalled = true }
+func (StubNetworkManager) Webport() int { return 1001 }
+func (StubNetworkManager) Get() (string, error) {
+	return "10.0.0.1", nil
+}
+func (StubNetworkManager) AddHandler(stateInterface AgentStateInterface) {
+	fmt.Println("thing")
+	addHandlerCalled = true
+}
+
+// AgentState test fixture
+var initStateCalled = false
+var setStatusCalled = false
+var setBuildingCalled = false
+var addDoneCalled = false
+var addArtefactCalled = false
+
+type StubAgentState struct{}
+
+func (StubAgentState) InitState(NetworkManagerInterface) { initStateCalled = true }
+func (StubAgentState) SetStatus(string)                  { setStatusCalled = true }
+func (StubAgentState) SetBuilding(string)                { setBuildingCalled = true }
+func (StubAgentState) AddDone(string)                    { addDoneCalled = true }
+func (StubAgentState) AddArtefact(Artefact)              { addArtefactCalled = true }
+func (StubAgentState) GetAgentState() AgentState {
+	return AgentState{
+		State: "foobar",
+	}
+}
+
 func TestGetNetworkIp_local(t *testing.T) {
 	expectedResult := "172.0.0.1"
 	result, err := NetworkManager{"local", 8080}.Get()
@@ -37,28 +73,6 @@ func TestGetNetworkIp_fail(t *testing.T) {
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
 	}
-}
-
-//type stubNetworkManager struct {
-//	backend string
-//	webPort int
-//}
-type StubNetworkManager struct{}
-
-func (StubNetworkManager) Get() (string, error) {
-	return "10.0.0.1", nil
-}
-
-func (StubNetworkManager) AddHandler(stateInterface AgentStateInterface) {
-	fmt.Println("thing")
-}
-
-func (StubNetworkManager) Listen() {
-	fmt.Println("thing")
-}
-
-func (StubNetworkManager) Webport() int {
-	return 1001
 }
 
 func TestInitState(t *testing.T) {
@@ -159,6 +173,47 @@ func TestAddArtefact(t *testing.T) {
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
 		t.Errorf("Object does not match expected state: %s", testStatus)
+	}
+}
+
+func TestGetAgentState(t *testing.T) {
+	testAgentState := AgentState{}
+	testAgentState.State = "test"
+	result := testAgentState.GetAgentState()
+
+	if result.State != testAgentState.State {
+		t.Errorf("Resulting object does not match passed object")
+	}
+
+}
+
+func TestWebport(t *testing.T) {
+	expectedResult := 8080
+	testNetManager := NetworkManager{webPort: expectedResult}
+
+	result := testNetManager.Webport()
+	if result != expectedResult {
+		t.Errorf("Webport is not correct: %d", result)
+	}
+
+}
+
+func TestListener(t *testing.T) {
+	initStateCalled = false
+	addHandlerCalled = false
+	listenCalled = false
+	ipGetter := StubNetworkManager{}
+	stateManager := StubAgentState{}
+
+	listener(ipGetter, stateManager)
+	if initStateCalled == false {
+		t.Errorf("InitState was not called")
+	}
+	if addHandlerCalled == false {
+		t.Errorf("AddHandler was not called")
+	}
+	if listenCalled == false {
+		t.Errorf("Listen was not called")
 	}
 }
 
