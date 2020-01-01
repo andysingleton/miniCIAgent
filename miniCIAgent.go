@@ -61,14 +61,15 @@ func main() {
 	pipelineConfig, err := getPipelineConfig(*manifestFile)
 	check(err)
 
-	workflowManager := WorkflowManager{*manifestFile, Workflows{}}
-	workflowManager.GetWorkflows()
+	workflowManager := WorkflowManager{*manifestFile, []Workflow{}, []Workflow{}}
+	workflowManager.readWorkflows()
 
 	// Start a gossip cluster
-	agentStates, err := memberlist.Create(memberlist.DefaultLocalConfig(), executionId)
+	gossipCluster, err := memberlist.Create(memberlist.DefaultLocalConfig(), executionId)
 	check(err)
 	agentManager := AgentManager{
-		*agentStates,
+		*gossipCluster,
+		[]AgentState{},
 	}
 
 	// spawn the status webservice
@@ -79,7 +80,7 @@ func main() {
 
 	// Local behaviour is to run all workflows in one process
 	if pipelineConfig.ExecutorBackend == "local" {
-		AgentLoop(agentManager, networkManager, workflowManager)
+		AgentLoop(&agentManager, networkManager, &workflowManager)
 		os.Exit(0)
 	}
 

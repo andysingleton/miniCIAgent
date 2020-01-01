@@ -4,5 +4,26 @@
   "executors": "local",
   "dockerfile": "test",
   "agentBinaryPath": "testpath",
-  "webPort": 8080
+  "webPort": 8080,
+  "workflows": [
+    {
+      "name": "Testing",
+      "tags": [ "test" ],
+      "source": [ "builder-files" ],
+      "wants": [ "artefact.json" ],
+      "steps": [
+        { "make":  "us-east-1" }
+      ]
+    },
+    {
+      "name": "Building",
+      "tags": [ "build" ],
+      "source": [ "builder-files" ],
+      "wants": [ "testArtefact" ],
+      "provides": [ "artefact.json" ],
+      "steps": [
+        { "make":  "us-east-1" }
+      ]
+    }
+  ]
 }

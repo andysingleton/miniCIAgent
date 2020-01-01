@@ -3,37 +3,36 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 )
 
-type Workflows struct {
-	Workflows []Workflow `json:"workflows"`
+type WorkflowManagerInterface interface {
+	readWorkflows()
+	updateAvailableWorkflows(AgentHandlerInterface, NetworkManagerInterface)
+	getAvailableWorkflowNumber() int
+	getAvailableWorkflow() (Workflow, error)
+}
+
+type WorkflowManager struct {
+	manifest           string
+	Workflows          []Workflow `json:"workflows"`
+	AvailableWorkflows []Workflow
 }
 
 type Workflow struct {
 	Name         string                   `json:"name"`
 	Tags         []string                 `json:"tags"`
-	Source       []map[string]string      `json:"source"`
-	Wants        []Artefact               `json:"wants"`
+	Source       []string                 `json:"source"`
+	Wants        []string                 `json:"wants"`
+	Events       []map[string]interface{} `json:"events"`
 	Steps        []map[string]interface{} `json:"steps"`
 	StepsIterate []map[string]string      `json:"stepsIterate"`
-	Provides     []map[string]string      `json:"provides"`
+	Provides     []string                 `json:"provides"`
 	State        string
 }
 
-type WorkflowManagerInterface interface {
-	GetWorkflows()
-	GetAvailableWorkflow(AgentHandlerInterface, NetworkManagerInterface) (Workflow, error)
-}
-
-type WorkflowManager struct {
-	manifest  string
-	workflows Workflows
-}
-
-func (manager WorkflowManager) GetWorkflows() {
+func (manager *WorkflowManager) readWorkflows() {
 	jsonFile, err := os.Open(manager.manifest)
 	check(err)
 	defer jsonFile.Close()
@@ -41,18 +40,18 @@ func (manager WorkflowManager) GetWorkflows() {
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	check(err)
 
-	err = json.Unmarshal(byteValue, &manager.workflows)
+	err = json.Unmarshal(byteValue, &manager)
 	check(err)
 }
 
-func (manager WorkflowManager) GetAvailableWorkflow(agentHandler AgentHandlerInterface, managerInterface NetworkManagerInterface) (Workflow, error) {
-	var agents []AgentState
-	agents = getAllAgentStates(agentHandler, managerInterface)
-	fmt.Println(executionId, ": Got agent states", agents)
+func (manager *WorkflowManager) updateAvailableWorkflows(agentHandler AgentHandlerInterface, networkManager NetworkManagerInterface) {
+	agentHandler.UpdateAgentStates(networkManager)
+	agents := agentHandler.GetStates()
 	var unavailableList []string
-	var artefacts []Artefact
+	var artefacts []string
 
 	// todo: implement something better here
+	var availableWorkflows []Workflow
 
 	for agent := range agents {
 		unavailableList = append(unavailableList, agents[agent].Done...)
@@ -60,23 +59,22 @@ func (manager WorkflowManager) GetAvailableWorkflow(agentHandler AgentHandlerInt
 		artefacts = append(artefacts, agents[agent].Artefacts...)
 	}
 
-	for workflow := range manager.workflows.Workflows {
+	for workflow := range manager.Workflows {
 		selectWorkflow := true
 
 		// is it available
 		for unavailable := range unavailableList {
-			if manager.workflows.Workflows[workflow].Name == unavailableList[unavailable] {
+			if manager.Workflows[workflow].Name == unavailableList[unavailable] {
 				selectWorkflow = false
 			}
-			return manager.workflows.Workflows[workflow], nil
 		}
 
 		// does it have all its pre-requisites
-		for workflowArtefact := range manager.workflows.Workflows[workflow].Wants {
-			// todo: is there set theory we could use here?
+		for workflowArtefact := range manager.Workflows[workflow].Wants {
+			artefactName := manager.Workflows[workflow].Wants[workflowArtefact]
 			artefactOk := false
 			for artefact := range artefacts {
-				if manager.workflows.Workflows[workflow].Wants[workflowArtefact].Name == artefacts[artefact].Name {
+				if artefacts[artefact] == artefactName {
 					artefactOk = true
 				}
 			}
@@ -85,26 +83,19 @@ func (manager WorkflowManager) GetAvailableWorkflow(agentHandler AgentHandlerInt
 			}
 		}
 		if selectWorkflow == true {
-			return manager.workflows.Workflows[workflow], nil
+			availableWorkflows = append(availableWorkflows, manager.Workflows[workflow])
 		}
 	}
-	return Workflow{}, errors.New("There are no workflows")
+	manager.AvailableWorkflows = availableWorkflows
 }
 
-func getAvailableWorkflowsAmount(workflows Workflows, memberWorkStates map[string]map[string]string) int {
-	fmt.Printf("workflows are %s", workflows)
-	//for workflow := range manifest["workflows"] {
-	//
-	//}
-	//return "test workflow", nil
-	return 2
+func (manager *WorkflowManager) getAvailableWorkflowNumber() int {
+	return len(manager.AvailableWorkflows)
 }
 
-func getCompletedWorkflowsAmount(workflows Workflows, memberWorkStates map[string]map[string]string) int {
-	fmt.Printf("workflows are %s", workflows)
-	//for workflow := range manifest["workflows"] {
-	//
-	//}
-	//return "test workflow", nil
-	return 2
+func (manager *WorkflowManager) getAvailableWorkflow() (Workflow, error) {
+	if len(manager.AvailableWorkflows) >= 1 {
+		return manager.AvailableWorkflows[0], nil
+	}
+	return Workflow{}, errors.New("There are no available workflows")
 }

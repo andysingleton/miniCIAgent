@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"log"
 	"net/http"
 	"sync"
@@ -58,23 +57,8 @@ type AgentStateInterface interface {
 	SetStatus(string)
 	SetBuilding(string)
 	AddDone(string)
-	AddArtefact(Artefact)
+	AddArtefact(string)
 	GetAgentState() AgentState
-}
-
-type AgentState struct {
-	Ip          string
-	ExecutionId uuid.UUID
-	State       string
-	Building    string
-	Done        []string
-	// { "name": type }
-	Artefacts []Artefact
-}
-
-type Artefact struct {
-	Name string
-	Type string
 }
 
 func (st AgentState) GetAgentState() AgentState {
@@ -110,7 +94,7 @@ func (st *AgentState) AddDone(workflowName string) {
 	mutex.Unlock()
 }
 
-func (st *AgentState) AddArtefact(artefact Artefact) {
+func (st *AgentState) AddArtefact(artefact string) {
 	mutex.Lock()
 	st.Artefacts = append(st.Artefacts, artefact)
 	mutex.Unlock()

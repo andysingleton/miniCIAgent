@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"miniCIAgent/memberlist"
 	"time"
@@ -11,10 +12,27 @@ import (
 type AgentHandlerInterface interface {
 	GetRemoteState(string) (AgentState, error)
 	GetMembers() []*memberlist.Node
+	GetStates() []AgentState
+	UpdateAgentStates(NetworkManagerInterface)
 }
 
 type AgentManager struct {
-	gossip memberlist.Memberlist
+	gossip      memberlist.Memberlist
+	agentStates []AgentState
+}
+
+type AgentState struct {
+	Ip          string
+	ExecutionId uuid.UUID
+	State       string
+	Building    string
+	Done        []string
+	// { "name": type }
+	Artefacts []string
+}
+
+func (handler AgentManager) GetStates() []AgentState {
+	return handler.agentStates
 }
 
 func (handler AgentManager) GetRemoteState(url string) (AgentState, error) {
@@ -38,9 +56,10 @@ func (handler AgentManager) GetMembers() []*memberlist.Node {
 	return handler.gossip.Members()
 }
 
-func getAllAgentStates(handler AgentHandlerInterface, managerInterface NetworkManagerInterface) []AgentState {
+func (handler *AgentManager) UpdateAgentStates(managerInterface NetworkManagerInterface) {
 	memberList := handler.GetMembers()
 	var agents []AgentState
+
 	for member := range memberList {
 		var agentState AgentState
 		connectionString := fmt.Sprintf("http://%s:%d", memberList[member], managerInterface.Webport())
@@ -48,34 +67,15 @@ func getAllAgentStates(handler AgentHandlerInterface, managerInterface NetworkMa
 		check(err)
 		agents = append(agents, agentState)
 	}
-	return agents
-}
-
-func getAvailableAgents(memberWorkStates map[string]map[string]string) int {
-	available := int(0)
-	for _, value := range memberWorkStates {
-		if value["workstate"] == "available" {
-			available += 1
-		}
-	}
-	return available
-}
-
-func launchAgent(IpAddress string, pipeline Pipeline) {
-	//if pipeline.ExecutorBackend == "docker" {
-	//	dockerFilePath := getQualifiedFilename(pipeline.ExecutorDockerDockerfile)
-	//	BuildContainer(dockerFilePath, pipeline.Name)
-	//	LaunchContainer(manifest.PipelineName, manifest.StartingWorkflow, *manifestFile, *workflowId, manifest.MiniciBinaryPath)
-	//}
-
+	handler.agentStates = agents
 }
 
 func AgentLoop(agentHandler AgentHandlerInterface, networkManager NetworkManagerInterface, workflowManager WorkflowManagerInterface) {
 	for true {
-
-		workflow, err := workflowManager.GetAvailableWorkflow(agentHandler, networkManager)
+		workflowManager.updateAvailableWorkflows(agentHandler, networkManager)
+		workflow, err := workflowManager.getAvailableWorkflow()
 		if err != nil {
-			fmt.Printf("%s: No work available. Terminating agent\n", executionId)
+			fmt.Println(executionId, ": No work available. Terminating agent")
 			break
 		}
 		fmt.Println("Got workflow", workflow)
