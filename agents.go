@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"miniCIAgent/memberlist"
 	"os"
-	"sync"
 	"time"
 )
 
@@ -47,55 +46,42 @@ func (agentState *AgentState) PromoteToBuilding(workflowName string) {
 	agentState.Pending = ""
 }
 
-func (st AgentState) GetAgentState() AgentState {
-	return st
+func (agentState AgentState) GetAgentState() AgentState {
+	return agentState
 }
 
 func (st *AgentState) InitState(ipGetter NetworkManagerInterface) {
 	var err error
-
-	mutex.Lock()
 	st.Ip, err = ipGetter.Get()
 	check(err)
 	st.ExecutionId = executionId
 	st.State = "Starting"
-	mutex.Unlock()
 }
 
 func (st *AgentState) SetStatus(newStatus string) {
-	mutex.Lock()
 	st.State = newStatus
-	mutex.Unlock()
 }
 
 func (st *AgentState) SetBuilding(workflowName string) {
-	mutex.Lock()
 	st.Building = workflowName
-	mutex.Unlock()
 }
 
 func (st *AgentState) AddDone(workflowName string) {
-	mutex.Lock()
 	st.Done = append(st.Done, workflowName)
-	mutex.Unlock()
 }
 
 func (st *AgentState) AddArtefact(artefact string) {
-	mutex.Lock()
 	st.Artefacts = append(st.Artefacts, artefact)
-	mutex.Unlock()
 }
 
 func listener(networkManager NetworkManagerInterface, stateManager AgentStateInterface) {
 	fmt.Println(executionId, ": Starting Listener")
-
 	stateManager.InitState(networkManager)
-
 	networkManager.AddHandler(stateManager)
 	networkManager.Listen()
 }
 
-type AgentHandlerInterface interface {
+type AgentManagerInterface interface {
 	GetRemoteState(string) (AgentState, error)
 	GetMembers() []*memberlist.Node
 	GetStates() []AgentState
@@ -146,17 +132,16 @@ func (handler *AgentManager) UpdateAgentStates(networkManager NetworkManagerInte
 	handler.agentStates = agents
 }
 
-func AgentLoop(agentHandler AgentHandlerInterface, networkManager NetworkManagerInterface,
-	workflowManager WorkflowManagerInterface, localStateManager AgentStateInterface, waitgGroup *sync.WaitGroup) {
+func AgentLoop(agentHandler AgentManagerInterface, networkManager NetworkManagerInterface,
+	workflowManager WorkflowManagerInterface, localStateManager AgentStateInterface) {
 	for true {
 		agentHandler.UpdateAgentStates(networkManager)
 		agents := agentHandler.GetStates()
 		workflow, err := workflowManager.GetAvailableWorkflow(agents)
 		if err != nil {
-			// terminate here
+
 			// todo: how do we handle artefacts hosted by the agent?
 			fmt.Println(executionId, ": No workflows available. Terminating agent")
-			defer waitgGroup.Done()
 			os.Exit(0)
 		}
 

@@ -6,14 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 )
 
-var (
-	mutex sync.Mutex
-	//state AgentState
-)
-
+// todo: Fix this abstraction
+// Its part webservice manager, part network config
 type NetworkManagerInterface interface {
 	Get() (string, error)
 	AddHandler(AgentStateInterface)

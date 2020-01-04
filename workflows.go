@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 type WorkflowManagerInterface interface {
 	ReadWorkflows(string) error
 	GetAvailableWorkflow([]AgentState) (Workflow, error)
 	IsWorkflowAvailable(Workflow) bool
-	updateCompletions([]AgentState)
+	UpdateCompletions([]AgentState)
 }
 
 type WorkflowManager struct {
@@ -78,7 +79,7 @@ func (manager *WorkflowManager) IsWorkflowAvailable(workflow Workflow) bool {
 	return selectWorkflow
 }
 
-func (manager *WorkflowManager) updateCompletions(agents []AgentState) {
+func (manager *WorkflowManager) UpdateCompletions(agents []AgentState) {
 	var unavailableList []string
 	var artefacts []string
 
@@ -93,7 +94,7 @@ func (manager *WorkflowManager) updateCompletions(agents []AgentState) {
 }
 
 func (manager *WorkflowManager) GetAvailableWorkflow(agents []AgentState) (Workflow, error) {
-	manager.updateCompletions(agents)
+	manager.UpdateCompletions(agents)
 	for workflow := range manager.Workflows {
 		selectWorkflow := manager.IsWorkflowAvailable(manager.Workflows[workflow])
 		if selectWorkflow == true {
@@ -106,7 +107,7 @@ func (manager *WorkflowManager) GetAvailableWorkflow(agents []AgentState) (Workf
 func processWorkflow(workflow Workflow, localStateManager AgentStateInterface) error {
 	// todo: processing workflow
 	fmt.Println(executionId, ": Processing workflow: ", workflow.Name)
-
+	time.Sleep(10 * time.Second)
 	// Success
 	for artefact := range workflow.Provides {
 		localStateManager.AddArtefact(workflow.Provides[artefact])

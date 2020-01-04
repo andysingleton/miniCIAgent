@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/google/uuid"
 	"reflect"
 	"testing"
 )
@@ -75,14 +74,13 @@ func TestGetNetworkIp_fail(t *testing.T) {
 func TestInitState(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	check(err)
+	testStatus.InitState(ipGetter)
+	// Since executionId is random, we have to copy it for the DeepEqual
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
-		ExecutionId: testId,
+		ExecutionId: testStatus.ExecutionId,
 		State:       "Starting",
 	}
-	testStatus.InitState(ipGetter)
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
@@ -93,15 +91,14 @@ func TestInitState(t *testing.T) {
 func TestSetState(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	check(err)
-	expectedState := AgentState{
-		Ip:          "10.0.0.1",
-		ExecutionId: testId,
-		State:       "foobar",
-	}
 	testStatus.InitState(ipGetter)
 	testStatus.SetStatus("foobar")
+
+	expectedState := AgentState{
+		Ip:          "10.0.0.1",
+		ExecutionId: testStatus.ExecutionId,
+		State:       "foobar",
+	}
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
@@ -112,16 +109,15 @@ func TestSetState(t *testing.T) {
 func TestSetBuilding(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	check(err)
+	testStatus.InitState(ipGetter)
+	testStatus.SetBuilding("foobar")
+
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
-		ExecutionId: testId,
+		ExecutionId: testStatus.ExecutionId,
 		State:       "Starting",
 		Building:    "foobar",
 	}
-	testStatus.InitState(ipGetter)
-	testStatus.SetBuilding("foobar")
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
@@ -132,16 +128,15 @@ func TestSetBuilding(t *testing.T) {
 func TestAddDone(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	check(err)
+	testStatus.InitState(ipGetter)
+	testStatus.AddDone("foobar")
+
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
-		ExecutionId: testId,
+		ExecutionId: testStatus.ExecutionId,
 		State:       "Starting",
 		Done:        []string{"foobar"},
 	}
-	testStatus.InitState(ipGetter)
-	testStatus.AddDone("foobar")
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
@@ -152,17 +147,16 @@ func TestAddDone(t *testing.T) {
 func TestAddArtefact(t *testing.T) {
 	ipGetter := StubNetworkManager{}
 	testStatus := AgentState{}
-	testId, err := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	check(err)
+	testStatus.InitState(ipGetter)
 	testArtefact := "foobar"
+	testStatus.AddArtefact(testArtefact)
+
 	expectedState := AgentState{
 		Ip:          "10.0.0.1",
-		ExecutionId: testId,
+		ExecutionId: testStatus.ExecutionId,
 		State:       "Starting",
 		Artefacts:   []string{testArtefact},
 	}
-	testStatus.InitState(ipGetter)
-	testStatus.AddArtefact(testArtefact)
 
 	eq := reflect.DeepEqual(expectedState, testStatus)
 	if eq == false {
