@@ -19,7 +19,6 @@
       "name": "Building",
       "tags": [ "build" ],
       "source": [ "builder-files" ],
-      "wants": [ "testArtefact" ],
       "provides": [ "artefact.json" ],
       "steps": [
         { "make":  "us-east-1" }

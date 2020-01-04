@@ -8,6 +8,7 @@ import (
 	"miniCIAgent/memberlist"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -22,7 +23,7 @@ type Pipeline struct {
 	WebPort          int    `json:"webPort"`
 }
 
-func getPipelineConfig(manifestFile string) (Pipeline, error) {
+func readPipelineManifest(manifestFile string) (Pipeline, error) {
 	jsonFile, err := os.Open(manifestFile)
 	if err != nil {
 		return Pipeline{}, err
@@ -34,10 +35,10 @@ func getPipelineConfig(manifestFile string) (Pipeline, error) {
 		return Pipeline{}, err
 	}
 
-	var pipeline Pipeline
-	err = json.Unmarshal(byteValue, &pipeline)
+	var manifest Pipeline
+	err = json.Unmarshal(byteValue, &manifest)
 
-	return pipeline, err
+	return manifest, err
 }
 
 func setExecutionId(id string) error {
@@ -51,18 +52,19 @@ func setExecutionId(id string) error {
 }
 
 func main() {
-	executionIdString := flag.String("pipeline-id", "new", "Name of the Pipeline manifest to build")
+	executionIdString := flag.String("pipeline-id", "new", "Pre-defined ID for this execution")
 	manifestFile := flag.String("manifest", "default.json", "Name of the Pipeline manifest to build")
+	externalArtefacts := flag.String("artifact", "", "Artefacts provided externally to this execution")
 	//parentIp := flag.String("parent-ip", "", "IP address of the process that started us")
 	flag.Parse()
 
 	err := setExecutionId(*executionIdString)
 	check(err)
-	pipelineConfig, err := getPipelineConfig(*manifestFile)
+	pipelineManifest, err := readPipelineManifest(*manifestFile)
 	check(err)
-
-	workflowManager := WorkflowManager{*manifestFile, []Workflow{}, []Workflow{}}
-	workflowManager.readWorkflows()
+	workflowManager := WorkflowManager{[]Workflow{}, []string{}, []string{*externalArtefacts}}
+	err = workflowManager.ReadWorkflows(*manifestFile)
+	check(err)
 
 	// Start a gossip cluster
 	gossipCluster, err := memberlist.Create(memberlist.DefaultLocalConfig(), executionId)
@@ -73,14 +75,17 @@ func main() {
 	}
 
 	// spawn the status webservice
-	networkManager := NetworkManager{pipelineConfig.ExecutorBackend, pipelineConfig.WebPort}
-	stateManager := AgentState{}
-	go listener(networkManager, &stateManager)
+	networkManager := NetworkManager{pipelineManifest.ExecutorBackend, pipelineManifest.WebPort}
+	localStateManager := AgentState{}
+	go listener(networkManager, &localStateManager)
 	time.Sleep(1 * time.Second)
 
 	// Local behaviour is to run all workflows in one process
-	if pipelineConfig.ExecutorBackend == "local" {
-		AgentLoop(&agentManager, networkManager, &workflowManager)
+	if pipelineManifest.ExecutorBackend == "local" {
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(1)
+		go AgentLoop(&agentManager, networkManager, &workflowManager, &localStateManager, &waitGroup)
+		waitGroup.Wait()
 		os.Exit(0)
 	}
 
@@ -88,10 +93,10 @@ func main() {
 	//if *parentIp != "" {
 	//	_, err := agentStates.Join([]string{*parentIp})
 	//	check(err)
-	//	AgentLoop(*parentIp, pipelineConfig, workflowDefinition, *agentStates)
+	//	AgentLoop(*parentIp, pipelineManifest, workflowDefinition, *agentStates)
 	//} else {
-	//	myIp, err := getNetworkIp(pipelineConfig.ExecutorBackend)
+	//	myIp, err := getNetworkIp(pipelineManifest.ExecutorBackend)
 	//	check(err)
-	//	launcherLoop(myIp, executionId, pipelineConfig, workflowDefinition, *agentStates)
+	//	launcherLoop(myIp, executionId, pipelineManifest, workflowDefinition, *agentStates)
 	//}
 }

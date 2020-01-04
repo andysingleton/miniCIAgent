@@ -3,21 +3,22 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 )
 
 type WorkflowManagerInterface interface {
-	readWorkflows()
-	updateAvailableWorkflows(AgentHandlerInterface, NetworkManagerInterface)
-	getAvailableWorkflowNumber() int
-	getAvailableWorkflow() (Workflow, error)
+	ReadWorkflows(string) error
+	GetAvailableWorkflow([]AgentState) (Workflow, error)
+	IsWorkflowAvailable(Workflow) bool
+	updateCompletions([]AgentState)
 }
 
 type WorkflowManager struct {
-	manifest           string
-	Workflows          []Workflow `json:"workflows"`
-	AvailableWorkflows []Workflow
+	Workflows       []Workflow `json:"workflows"`
+	UnavailableList []string
+	Artefacts       []string
 }
 
 type Workflow struct {
@@ -32,70 +33,84 @@ type Workflow struct {
 	State        string
 }
 
-func (manager *WorkflowManager) readWorkflows() {
-	jsonFile, err := os.Open(manager.manifest)
-	check(err)
+func (manager *WorkflowManager) ReadWorkflows(manifest string) error {
+	jsonFile, err := os.Open(manifest)
+	if err != nil {
+		return err
+	}
 	defer jsonFile.Close()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	err = json.Unmarshal(byteValue, &manager)
-	check(err)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (manager *WorkflowManager) updateAvailableWorkflows(agentHandler AgentHandlerInterface, networkManager NetworkManagerInterface) {
-	agentHandler.UpdateAgentStates(networkManager)
-	agents := agentHandler.GetStates()
+func (manager *WorkflowManager) IsWorkflowAvailable(workflow Workflow) bool {
+	selectWorkflow := true
+
+	// is it available
+	for unavailable := range manager.UnavailableList {
+		if workflow.Name == manager.UnavailableList[unavailable] {
+			selectWorkflow = false
+		}
+	}
+
+	// does it have all its pre-requisites
+	for workflowArtefact := range workflow.Wants {
+		artefactName := workflow.Wants[workflowArtefact]
+		artefactOk := false
+		for artefact := range manager.Artefacts {
+			if manager.Artefacts[artefact] == artefactName {
+				artefactOk = true
+			}
+		}
+		if artefactOk == false {
+			selectWorkflow = false
+		}
+	}
+	return selectWorkflow
+}
+
+func (manager *WorkflowManager) updateCompletions(agents []AgentState) {
 	var unavailableList []string
 	var artefacts []string
-
-	// todo: implement something better here
-	var availableWorkflows []Workflow
 
 	for agent := range agents {
 		unavailableList = append(unavailableList, agents[agent].Done...)
 		unavailableList = append(unavailableList, agents[agent].Building)
+		unavailableList = append(unavailableList, agents[agent].Pending)
 		artefacts = append(artefacts, agents[agent].Artefacts...)
 	}
+	manager.UnavailableList = unavailableList
+	manager.Artefacts = artefacts
+}
 
+func (manager *WorkflowManager) GetAvailableWorkflow(agents []AgentState) (Workflow, error) {
+	manager.updateCompletions(agents)
 	for workflow := range manager.Workflows {
-		selectWorkflow := true
-
-		// is it available
-		for unavailable := range unavailableList {
-			if manager.Workflows[workflow].Name == unavailableList[unavailable] {
-				selectWorkflow = false
-			}
-		}
-
-		// does it have all its pre-requisites
-		for workflowArtefact := range manager.Workflows[workflow].Wants {
-			artefactName := manager.Workflows[workflow].Wants[workflowArtefact]
-			artefactOk := false
-			for artefact := range artefacts {
-				if artefacts[artefact] == artefactName {
-					artefactOk = true
-				}
-			}
-			if artefactOk == false {
-				selectWorkflow = false
-			}
-		}
+		selectWorkflow := manager.IsWorkflowAvailable(manager.Workflows[workflow])
 		if selectWorkflow == true {
-			availableWorkflows = append(availableWorkflows, manager.Workflows[workflow])
+			return manager.Workflows[workflow], nil
 		}
 	}
-	manager.AvailableWorkflows = availableWorkflows
+	return Workflow{}, errors.New("No available workflows")
 }
 
-func (manager *WorkflowManager) getAvailableWorkflowNumber() int {
-	return len(manager.AvailableWorkflows)
-}
+func processWorkflow(workflow Workflow, localStateManager AgentStateInterface) error {
+	// todo: processing workflow
+	fmt.Println(executionId, ": Processing workflow: ", workflow.Name)
 
-func (manager *WorkflowManager) getAvailableWorkflow() (Workflow, error) {
-	if len(manager.AvailableWorkflows) >= 1 {
-		return manager.AvailableWorkflows[0], nil
+	// Success
+	for artefact := range workflow.Provides {
+		localStateManager.AddArtefact(workflow.Provides[artefact])
 	}
-	return Workflow{}, errors.New("There are no available workflows")
+	localStateManager.PromoteToDone(workflow.Name)
+	return nil
 }

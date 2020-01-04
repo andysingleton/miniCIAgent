@@ -31,6 +31,9 @@ func (StubAgentState) SetStatus(string)                  {}
 func (StubAgentState) SetBuilding(string)                {}
 func (StubAgentState) AddDone(string)                    {}
 func (StubAgentState) AddArtefact(string)                {}
+func (StubAgentState) PromoteToBuilding(string)          {}
+func (StubAgentState) PromoteToDone(string)              {}
+func (StubAgentState) SetPendingWorkflow(string)         {}
 func (StubAgentState) GetAgentState() AgentState {
 	return AgentState{
 		State: "foobar",

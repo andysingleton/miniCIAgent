@@ -17,8 +17,8 @@ func (StubWorkflowManager) getAvailableWorkflow(AgentHandlerInterface, NetworkMa
 }
 
 func TestGetWorkflows(t *testing.T) {
-	manager := WorkflowManager{manifest: "test-manifest.json"}
-	manager.readWorkflows()
+	manager := WorkflowManager{}
+	manager.ReadWorkflows("test-manifest.json")
 
 	workflowSuccess := false
 	for workflow := range manager.Workflows {
@@ -31,14 +31,25 @@ func TestGetWorkflows(t *testing.T) {
 	}
 }
 
+//func (manager *WorkflowManager) GetAvailableWorkflow(agents []AgentState) (Workflow, error) {
+//	manager.updateCompletions(agents)
+//	for workflow := range manager.Workflows {
+//		selectWorkflow := manager.IsWorkflowAvailable(manager.Workflows[workflow])
+//		if selectWorkflow == true {
+//			return manager.Workflows[workflow], nil
+//		}
+//	}
+//	return Workflow{}, errors.New("No available workflows")
+//}
+
 func TestGetAvailableWorkflow_success(t *testing.T) {
 	agentHandler := StubAgentManager{}
-	networkManager := StubNetworkManager{}
-	agentHandler.UpdateAgentStates(networkManager)
-	manager := WorkflowManager{manifest: "test-manifest.json"}
-	manager.readWorkflows()
-	manager.updateAvailableWorkflows(&agentHandler, networkManager)
-	workflow, _ := manager.getAvailableWorkflow()
+	agents := agentHandler.GetStates()
+	manager := WorkflowManager{}
+	err := manager.ReadWorkflows("test-manifest.json")
+	check(err)
+
+	workflow, _ := manager.GetAvailableWorkflow(agents)
 	if workflow.Name != "Building" {
 		t.Errorf("Available workflow was not returned")
 	}
@@ -46,12 +57,12 @@ func TestGetAvailableWorkflow_success(t *testing.T) {
 
 func TestGetAvailableWorkflow_fail_availability(t *testing.T) {
 	agentHandler := StubAgentManagerBusy{}
-	networkManager := StubNetworkManager{}
-	manager := WorkflowManager{manifest: "test-manifest.json"}
-	manager.readWorkflows()
-	manager.updateAvailableWorkflows(&agentHandler, networkManager)
-	workflow, err := manager.getAvailableWorkflow()
+	agents := agentHandler.GetStates()
+	manager := WorkflowManager{}
+	err := manager.ReadWorkflows("test-manifest.json")
+	check(err)
 
+	workflow, err := manager.GetAvailableWorkflow(agents)
 	if err == nil {
 		t.Errorf("No workflows should have been returned %s", workflow)
 	}
@@ -59,26 +70,13 @@ func TestGetAvailableWorkflow_fail_availability(t *testing.T) {
 
 func TestGetAvailableWorkflow_fail_no_artefacts(t *testing.T) {
 	agentHandler := StubAgentManagerNoArtefacts{}
-	networkManager := StubNetworkManager{}
-	manager := WorkflowManager{manifest: "test-manifest.json"}
-	manager.readWorkflows()
-	manager.updateAvailableWorkflows(&agentHandler, networkManager)
-	workflow, err := manager.getAvailableWorkflow()
+	agents := agentHandler.GetStates()
+	manager := WorkflowManager{}
+	err := manager.ReadWorkflows("test-manifest.json")
+	check(err)
 
+	workflow, err := manager.GetAvailableWorkflow(agents)
 	if err == nil {
 		t.Errorf("No workflows should have been returned %s", workflow)
-	}
-}
-
-func TestGetAvailableWorkflowsAmount(t *testing.T) {
-	expectedResult := 1
-	agentHandler := StubAgentManager{}
-	networkManager := StubNetworkManager{}
-	manager := WorkflowManager{manifest: "test-manifest.json"}
-	manager.readWorkflows()
-	manager.updateAvailableWorkflows(&agentHandler, networkManager)
-	result := manager.getAvailableWorkflowNumber()
-	if result != expectedResult {
-		t.Errorf("The wrong number of workflows was returned: %d", result)
 	}
 }

@@ -39,7 +39,7 @@ func TestGetPipelineConfig(t *testing.T) {
 		MiniciBinaryPath: "testpath",
 		WebPort:          8080,
 	}
-	result, err := getPipelineConfig("test-manifest.json")
+	result, err := readPipelineManifest("test-manifest.json")
 
 	if err != nil {
 		t.Errorf("Function raised an error: #{err}")
@@ -51,7 +51,7 @@ func TestGetPipelineConfig(t *testing.T) {
 }
 
 func TestGetPipelineConfig_fail_nofile(t *testing.T) {
-	_, err := getPipelineConfig("nofile.json")
+	_, err := readPipelineManifest("nofile.json")
 
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
@@ -59,7 +59,7 @@ func TestGetPipelineConfig_fail_nofile(t *testing.T) {
 }
 
 func TestGetPipelineConfig_fail_malformed_json(t *testing.T) {
-	_, err := getPipelineConfig("test-manifest-malformed.json")
+	_, err := readPipelineManifest("test-manifest-malformed.json")
 
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
@@ -67,7 +67,7 @@ func TestGetPipelineConfig_fail_malformed_json(t *testing.T) {
 }
 
 func TestGetPipelineConfig_fail_bad_types(t *testing.T) {
-	_, err := getPipelineConfig("test-manifest-bad-types.json")
+	_, err := readPipelineManifest("test-manifest-bad-types.json")
 
 	if err == nil {
 		t.Errorf("Function did not raise expected error")
