@@ -47,3 +47,10 @@ func (net NetworkManager) AddHandler(state AgentStateInterface) {
 func (net NetworkManager) Listen() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", net.webPort), nil))
 }
+
+func listener(networkManager NetworkManagerInterface, stateManager AgentStateInterface) {
+	fmt.Println(executionId, ": Starting Listener")
+	stateManager.InitState(networkManager)
+	networkManager.AddHandler(stateManager)
+	networkManager.Listen()
+}

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/google/uuid"
-	"miniCIAgent/memberlist"
+	memberlist "github.com/hashicorp/memberlist"
 	"net/http"
 	"os"
 	"time"
@@ -24,7 +24,7 @@ func main() {
 	check(err)
 
 	// Start a gossip cluster
-	gossipCluster, err := memberlist.Create(memberlist.DefaultLocalConfig(), executionId)
+	gossipCluster, err := memberlist.Create(memberlist.DefaultLocalConfig())
 	check(err)
 	agentManager := AgentManager{
 		*gossipCluster,

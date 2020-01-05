@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	memberlist "github.com/hashicorp/memberlist"
 	"io/ioutil"
-	"miniCIAgent/memberlist"
 	"os"
 	"time"
 )
@@ -72,13 +72,6 @@ func (st *AgentState) AddDone(workflowName string) {
 
 func (st *AgentState) AddArtefact(artefact string) {
 	st.Artefacts = append(st.Artefacts, artefact)
-}
-
-func listener(networkManager NetworkManagerInterface, stateManager AgentStateInterface) {
-	fmt.Println(executionId, ": Starting Listener")
-	stateManager.InitState(networkManager)
-	networkManager.AddHandler(stateManager)
-	networkManager.Listen()
 }
 
 type AgentManagerInterface interface {
